@@ -8,11 +8,11 @@ android {
         release {
         }
     }
-    namespace 'com.whispertflite'
+    namespace 'com.autoscrollmusicsheet'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.whispertflite"
+        applicationId "com.autoscrollmusicsheet"
         minSdk 26
         targetSdk 34
         versionCode 1

@@ -1,8 +1,8 @@
-package com.whispertflite.engine;
+package com.autoscrollmusicsheet.engine;
 
 import android.util.Log;
 
-import com.whispertflite.asr.IWhisperListener;
+import com.autoscrollmusicsheet.asr.IWhisperListener;
 
 public class WhisperEngineNative implements IWhisperEngine {
     private final String TAG = "WhisperEngineNative";

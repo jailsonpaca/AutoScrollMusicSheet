@@ -1,4 +1,4 @@
-package com.whispertflite;
+package com.autoscrollmusicsheet;
 
 import android.Manifest;
 import android.content.Context;
@@ -14,12 +14,12 @@ import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
-import com.whispertflite.asr.IRecorderListener;
-import com.whispertflite.asr.IWhisperListener;
-import com.whispertflite.debug.ModelDebugger;
-import com.whispertflite.utils.WaveUtil;
-import com.whispertflite.asr.Recorder;
-import com.whispertflite.asr.Whisper;
+import com.autoscrollmusicsheet.asr.IRecorderListener;
+import com.autoscrollmusicsheet.asr.IWhisperListener;
+import com.autoscrollmusicsheet.debug.ModelDebugger;
+import com.autoscrollmusicsheet.utils.WaveUtil;
+import com.autoscrollmusicsheet.asr.Recorder;
+import com.autoscrollmusicsheet.asr.Whisper;
 
 import java.io.File;
 import java.io.FileOutputStream;

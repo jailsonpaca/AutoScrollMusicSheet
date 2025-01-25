@@ -1,16 +1,15 @@
-package com.whispertflite.debug;
+package com.autoscrollmusicsheet.debug;
 
 import android.content.Context;
 import android.content.res.AssetFileDescriptor;
 import android.util.Log;
 
 import org.tensorflow.lite.Interpreter;
-import org.tensorflow.lite.Tensor;
 
 import java.io.FileInputStream;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
-import java.util.Arrays;
+
 public class ModelDebugger {
     private static final String TAG = "TFLite_Debug";
 
