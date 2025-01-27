@@ -63,6 +63,7 @@ public class WhisperEngineNative implements IWhisperEngine {
     }
 
     static {
+        System.loadLibrary("tensorflowlite"); // This should map to libtensorflowlite.so
         System.loadLibrary("audioEngine");
     }
 
