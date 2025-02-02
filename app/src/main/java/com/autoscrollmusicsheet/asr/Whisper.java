@@ -6,6 +6,8 @@ import android.util.Log;
 import com.autoscrollmusicsheet.engine.IWhisperEngine;
 import com.autoscrollmusicsheet.engine.WhisperEngineNative;
 
+import org.jetbrains.annotations.NotNull;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.LinkedList;
@@ -189,5 +191,10 @@ public class Whisper {
             // Start the transcribe thread
             mMicTranscribeThread.start();
         }
+    }
+
+    @NotNull
+    public Object initialize(@NotNull String actualModelPath, @NotNull String actualVocabPath, boolean useMultilingual) {
+        return null;
     }
 }

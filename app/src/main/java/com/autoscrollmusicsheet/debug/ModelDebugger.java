@@ -13,6 +13,15 @@ import java.nio.channels.FileChannel;
 public class ModelDebugger {
     private static final String TAG = "TFLite_Debug";
 
+    static {
+        try {
+            System.loadLibrary("tensorflowlite_jni");
+            Log.d(TAG, "TensorFlow Lite native library loaded successfully");
+        } catch (UnsatisfiedLinkError e) {
+            Log.e(TAG, "Failed to load TensorFlow Lite native library", e);
+        }
+    }
+
     public String debugTFLiteModel(Context context, String modelPath) {
         StringBuilder debugInfo = new StringBuilder();
 
@@ -31,52 +40,44 @@ public class ModelDebugger {
             options.setUseNNAPI(false);
 
             Log.d(TAG, "Creating interpreter...");
-            Interpreter interpreter = new Interpreter(model, options);
-            Log.d(TAG, "Interpreter created successfully");
-
-            // Create input with correct shape [1, 80, 3000]
-            float[][][] inputArray = new float[1][80][3000];
-            // Fill with small random values between -1 and 1
-            for (int i = 0; i < 80; i++) {
-                for (int j = 0; j < 3000; j++) {
-                    inputArray[0][i][j] = (float) (Math.random() * 2 - 1) * 0.1f;
-                }
-            }
-
-            // Create output array with correct shape [1, 501]
-            int[][] outputArray = new int[1][501];
-
-            Log.d(TAG, "Attempting inference with properly shaped data...");
             try {
+                Interpreter interpreter = new Interpreter(model, options);
+                Log.d(TAG, "Interpreter created successfully");
+
+                // Create input with correct shape [1, 80, 3000]
+                float[][][] inputArray = new float[1][80][3000];
+                // Fill with small random values between -1 and 1
+                for (int i = 0; i < 80; i++) {
+                    for (int j = 0; j < 3000; j++) {
+                        inputArray[0][i][j] = (float) (Math.random() * 2 - 1) * 0.1f;
+                    }
+                }
+
+                // Create output array with correct shape [1, 501]
+                int[][] outputArray = new int[1][501];
+
+                Log.d(TAG, "Attempting inference with properly shaped data...");
                 interpreter.run(inputArray, outputArray);
                 Log.d(TAG, "Inference successful!");
-                debugInfo.append("Inference completed successfully!\n");
 
-                // Log first few output values
-                StringBuilder outputValues = new StringBuilder("First 10 output values: ");
-                for (int i = 0; i < Math.min(10, outputArray[0].length); i++) {
-                    outputValues.append(outputArray[0][i]).append(" ");
-                }
-                Log.d(TAG, outputValues.toString());
-                debugInfo.append(outputValues);
+                debugInfo.append("Model loaded and tested successfully\n");
+                debugInfo.append("Input shape: [1, 80, 3000]\n");
+                debugInfo.append("Output shape: [1, 501]\n");
 
+                interpreter.close();
             } catch (Exception e) {
-                Log.e(TAG, "Inference failed", e);
-                debugInfo.append("Inference Error: ").append(e.getMessage()).append("\n");
-                e.printStackTrace();
+                Log.e(TAG, "Error during interpreter creation/inference", e);
+                debugInfo.append("Error during interpreter creation/inference: ").append(e.getMessage());
             }
 
-            interpreter.close();
-            fileDescriptor.close();
             inputStream.close();
-
-            return debugInfo.toString();
+            fileDescriptor.close();
 
         } catch (Exception e) {
-            String errorMsg = "Model inspection failed: " + e.getMessage();
-            Log.e(TAG, errorMsg, e);
-            e.printStackTrace();
-            return errorMsg;
+            Log.e(TAG, "Error loading model", e);
+            debugInfo.append("Error loading model: ").append(e.getMessage());
         }
+
+        return debugInfo.toString();
     }
 }

@@ -1,7 +1,6 @@
 package com.autoscrollmusicsheet
 
 import android.Manifest
-import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Handler
@@ -14,20 +13,20 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.autoscrollmusicsheet.asr.ASRListener
+import com.autoscrollmusicsheet.asr.ASRManager
 import com.autoscrollmusicsheet.asr.IRecorderListener
-import com.autoscrollmusicsheet.asr.IWhisperListener
 import com.autoscrollmusicsheet.asr.Recorder
+import com.autoscrollmusicsheet.asr.VoskLayer
 import com.autoscrollmusicsheet.asr.Whisper
-import com.autoscrollmusicsheet.utils.WaveUtil
-import com.autoscrollmusicsheet.debug.ModelDebugger;
-import java.io.File
-import java.io.IOException
+import com.autoscrollmusicsheet.asr.WhisperLayer
+import org.tensorflow.lite.TensorFlowLite
 
 class MainActivity : AppCompatActivity() {
     private val TAG = "MainActivity"
+    private lateinit var asrManager: ASRManager
     private var mWhisper: Whisper? = null
     private var mRecorder: Recorder? = null
-    private val handler: Handler = Handler(Looper.getMainLooper())
     private val audioTextMatcher = AudioTextMatcher()
 
     private lateinit var contentView: TextView
@@ -40,6 +39,18 @@ class MainActivity : AppCompatActivity() {
     private var CURRENT_STATE: Int? = null
 
     private val PERMISSIONS_REQUEST_RECORD_AUDIO: Int = 1
+    companion object {
+        private val TAG = "MainActivity"
+
+        init {
+            try {
+                System.loadLibrary("tensorflowlite_jni")
+                Log.d(TAG, "TensorFlow Lite native library loaded successfully")
+            } catch (e: UnsatisfiedLinkError) {
+                Log.e(TAG, "Failed to load TensorFlow Lite native library", e)
+            }
+        }
+    }
 
     private val content = """
         Mudam-se os tempos, mudam-se as vontades,
@@ -61,40 +72,56 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        initializeViews()
-        mWhisper = Whisper(this)
-        mRecorder = Recorder(this)
 
-        // logModel()
-        // Assume this Activity is the current activity, check record permission
+        // Skip TensorFlow Lite initialization here since we're handling it in the native code
+        initializeViews()
         checkRecordPermissionAndPrepare()
     }
-    private fun logModel() {
-        try {
-            val debugger = ModelDebugger()
-            val debugInfo = debugger.debugTFLiteModel(
-                this,
-                "whisper-small-pt-v2.tflite" // Your model path in assets
-            )
-            Log.d(TAG, "Model Debug Info:\n$debugInfo")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to debug model", e)
-        }
-    }
-
+   
     private fun initializeViews() {
         contentView = findViewById(R.id.contentView)
         resultView = findViewById<TextView>(R.id.result_text)
         recordButton = findViewById(R.id.recordButton)
         setUiState(STATE_STARTING)
-        recordButton.setOnClickListener { view: View? ->  initializeRecognizer() }
-
+        recordButton.setOnClickListener { toggleRecording() }
         updateDisplay(0)
     }
 
+    private fun toggleRecording() {
+        when (CURRENT_STATE) {
+            STATE_RECORDING -> {
+                stopRecording()
+                setUiState(STATE_READY)
+            }
+            else -> {
+                startRecording()
+                setUiState(STATE_RECORDING)
+            }
+        }
+    }
+
+    private fun startRecording() {
+        try {
+            mRecorder?.start()
+            Log.d(TAG, "Recording started")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting recording", e)
+            resultView?.text = "Error starting recording: ${e.message}"
+        }
+    }
+
+    private fun stopRecording() {
+        try {
+            mRecorder?.stop()
+            Log.d(TAG, "Recording stopped")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error stopping recording", e)
+            resultView?.text = "Error stopping recording: ${e.message}"
+        }
+    }
+
     private fun checkRecordPermissionAndPrepare() {
-        val permissionCheck =
-            ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.RECORD_AUDIO)
+        val permissionCheck = ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.RECORD_AUDIO)
         if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(
                 this,
@@ -102,79 +129,78 @@ class MainActivity : AppCompatActivity() {
                 PERMISSIONS_REQUEST_RECORD_AUDIO
             )
         } else {
-            initModel()
-        }
-    }
-
-    private fun initModel() {
-        val modelPath: String
-        val vocabPath: String
-        val useMultilingual = false
-        if (useMultilingual) {
-            // Multilingual model and vocab
-            modelPath = getFilePath("whisper-tiny.tflite")
-            vocabPath = getFilePath("filters_vocab_multilingual.bin")
-        } else {
-            // English-only model and vocab
-            modelPath = getFilePath("whisper-tiny-en.tflite")
-            vocabPath = getFilePath("filters_vocab_en.bin")
-        }
-        mWhisper?.loadModel(modelPath, vocabPath, useMultilingual)
-    }
-    private fun initializeRecognizer() {
-        if(CURRENT_STATE == STATE_RECORDING){
-            mWhisper?.stop();
-            mRecorder?.stop();
-            setUiState(STATE_READY)
-        }else {
-            try {
-                val waveFilePath: String = getFilePath(WaveUtil.RECORDING_FILE)
-                mRecorder!!.setListener(object : IRecorderListener {
-                    override fun onUpdateReceived(message: String) {
-                        Log.d(TAG, "Update is received, Message: $message")
-                        // handler.post { tvStatus.setText(message)
-                    }
-
-                    override fun onDataReceived(samples: FloatArray) {
-                        //mWhisper.writeBuffer(samples);
-                    }
-                })
-                mRecorder!!.setFilePath(waveFilePath)
-                mRecorder!!.start()
-                mWhisper?.setListener(object : IWhisperListener {
-                    override fun onUpdateReceived(message: String?) {
-                        TODO("Not yet implemented")
-                    }
-
-                    override fun onResultReceived(result: String) {
-                        Log.d(TAG, "onResultReceived: $result")
-                        handler.post { resultView?.append(result) }
-                        processResult(result)
-                    }
-                })
-                setUiState(STATE_RECORDING)
-            } catch (e: IOException) {
-                e.printStackTrace()
-            }
-
+            prepareAudioProcessing()
         }
     }
 
     override fun onRequestPermissionsResult(
         requestCode: Int,
-        permissions: Array<String>, grantResults: IntArray
+        permissions: Array<String>,
+        grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-
         if (requestCode == PERMISSIONS_REQUEST_RECORD_AUDIO) {
-            if (grantResults.size > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                // Recognizer initialization is a time-consuming and it involves IO,
-                // so we execute it in async task
-                initModel()
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                prepareAudioProcessing()
             } else {
-                finish()
+                resultView?.text = "Audio recording permission is required for this app to work"
             }
         }
+    }
+
+    private fun prepareAudioProcessing() {
+        try {
+            Log.d(TAG, "Initializing ASR models...")
+
+            // Initialize ASR Manager and layers
+            asrManager = ASRManager(this)
+            asrManager.registerLayer(WhisperLayer(this), 2) // Whisper has higher weight
+            asrManager.registerLayer(VoskLayer(this), 1)    // Vosk has lower weight
+            asrManager.initializeModels()
+
+            // Initialize Recorder
+            mRecorder = Recorder(this)
+            mRecorder?.setListener(object : IRecorderListener {
+                override fun onUpdateReceived(message: String) {
+                    Log.d(TAG, "Recorder update: $message")
+                }
+
+                override fun onDataReceived(samples: FloatArray) {
+                    asrManager.processAudio(samples)
+                }
+            })
+
+            asrManager.setListener(object : ASRListener {
+                override fun onResultReceived(result: String) {
+                    if(CURRENT_STATE == STATE_RECORDING) {
+                        handleRecognitionResult(result)
+                    }
+                }
+
+                override fun onError(error: String) {
+                    Log.e(TAG, "ASR Error: $error")
+                    runOnUiThread {
+                        resultView?.text = "Error: $error"
+                    }
+                }
+            })
+
+            setUiState(STATE_READY)
+            Log.d(TAG, "ASR models are ready.")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error preparing audio processing", e)
+            runOnUiThread {
+                resultView?.text = "Error preparing audio: ${e.message}"
+            }
+        }
+    }
+
+    private fun handleRecognitionResult(result: String) {
+        Log.d(TAG, "ASR Result: $result")
+        runOnUiThread {
+            resultView?.append("$result\n")
+        }
+        processResult(result)
     }
 
     private fun updateDisplay(position: Int) {
@@ -183,6 +209,7 @@ class MainActivity : AppCompatActivity() {
             contentView.text = visibleLines.joinToString("\n")
         }
     }
+    
     private fun setUiState(state: Int) {
         CURRENT_STATE=state
         when (state) {
@@ -223,21 +250,14 @@ class MainActivity : AppCompatActivity() {
             e.printStackTrace()
         }
     }
-    // Returns file path from data folder
-    private fun getFilePath(assetName: String): String {
-        val outfile = File(filesDir, assetName)
-        if (!outfile.exists()) {
-            Log.d(TAG, "File not found - " + outfile.absolutePath)
-        }
-
-        Log.d(TAG, "Returned asset path: " + outfile.absolutePath)
-        return outfile.absolutePath
-    }
 
     public override fun onDestroy() {
         super.onDestroy()
-
-        mWhisper?.stop();
-        mRecorder?.stop();
+        try {
+            mRecorder?.stop()
+            asrManager.close()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error cleaning up resources", e)
+        }
     }
 }

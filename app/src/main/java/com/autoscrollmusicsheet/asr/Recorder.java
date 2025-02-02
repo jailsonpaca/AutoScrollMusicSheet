@@ -164,4 +164,12 @@ public class Recorder {
             sendUpdate(e.getMessage());
         }
     }
+
+    public void startRecording() {
+
+    }
+
+    public void stopRecording() {
+
+    }
 }
